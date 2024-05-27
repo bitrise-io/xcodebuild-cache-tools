@@ -9,7 +9,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/bitrise-io/go-steputils/v2/proto/kv_storage"
+	"github.com/bitrise-io/xcodebuild-cache-tools/ddcache-save/proto/kv_storage"
 	"google.golang.org/genproto/googleapis/bytestream"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
