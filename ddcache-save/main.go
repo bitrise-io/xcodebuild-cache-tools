@@ -11,6 +11,8 @@ import (
 	"os"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
+
 	"github.com/bitrise-io/go-utils/retry"
 	"github.com/bitrise-io/go-utils/v2/log"
 	"github.com/bitrise-io/xcodebuild-cache-tools/ddcache-save/kv"
@@ -48,6 +50,7 @@ func parseUrlGRPC(s string) (string, bool, error) {
 }
 
 func upload(filePath, key, accessToken, cacheUrl string, logger log.Logger) error {
+	fmt.Printf("Uploading %s to %s\n", filePath, cacheUrl)
 	buildCacheHost, insecureGRPC, err := parseUrlGRPC(cacheUrl)
 	if err != nil {
 		return fmt.Errorf(
@@ -89,6 +92,8 @@ func upload(filePath, key, accessToken, cacheUrl string, logger log.Logger) erro
 		if err != nil {
 			return fmt.Errorf("stat %q: %w", filePath, err), false
 		}
+
+		fmt.Printf("Uploading %s to %s - size %s\n", filePath, cacheUrl, humanize.Bytes(uint64(stat.Size())))
 
 		kvWriter, err := kvClient.Put(ctx, kv.PutParams{
 			Name:      key,
