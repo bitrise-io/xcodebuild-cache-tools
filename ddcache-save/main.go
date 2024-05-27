@@ -14,11 +14,6 @@ import (
 	"github.com/bitrise-io/xcodebuild-cache-tools/ddcache-save/network"
 )
 
-const (
-	// DefaultServiceURL ...
-	DefaultServiceURL = "https://cache.bitrise.io"
-)
-
 func checksumOfFile(path string) (string, error) {
 	hash := sha256.New()
 
@@ -36,8 +31,8 @@ func checksumOfFile(path string) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func upload(filePath, appSlug, key, accessToken string, logger log.Logger) error {
-	client := network.NewAPIClient(retryhttp.NewClient(logger), DefaultServiceURL, accessToken, logger)
+func upload(filePath, appSlug, key, accessToken, baseUrl string, logger log.Logger) error {
+	client := network.NewAPIClient(retryhttp.NewClient(logger), baseUrl, accessToken, logger)
 
 	checksum, err := checksumOfFile(filePath)
 	if err != nil {
@@ -45,7 +40,7 @@ func upload(filePath, appSlug, key, accessToken string, logger log.Logger) error
 		// fail silently and continue
 	}
 
-	url := fmt.Sprintf("%s/cache/%s/%s", DefaultServiceURL, appSlug, key)
+	url := fmt.Sprintf("%s/cache/%s/%s", baseUrl, appSlug, key)
 
 	buildCacheHeaders := map[string]string{
 		"Authorization":                    fmt.Sprintf("Bearer %s", accessToken),
@@ -61,12 +56,12 @@ func upload(filePath, appSlug, key, accessToken string, logger log.Logger) error
 	return nil
 }
 
-func uploadCacheArchive(filePath, branch, appSlug, accessToken string, logger log.Logger) error {
-	return upload(filePath, appSlug, fmt.Sprintf("%s-archive", branch), accessToken, logger)
+func uploadCacheArchive(filePath, branch, appSlug, accessToken, baseUrl string, logger log.Logger) error {
+	return upload(filePath, appSlug, fmt.Sprintf("%s-archive", branch), accessToken, baseUrl, logger)
 }
 
-func uploadMetadata(filePath, branch, appSlug, accessToken string, logger log.Logger) error {
-	return upload(filePath, appSlug, fmt.Sprintf("%s-metadata", branch), accessToken, logger)
+func uploadMetadata(filePath, branch, appSlug, accessToken, baseUrl string, logger log.Logger) error {
+	return upload(filePath, appSlug, fmt.Sprintf("%s-metadata", branch), accessToken, baseUrl, logger)
 }
 
 func main() {
@@ -87,12 +82,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := uploadCacheArchive(*cacheArchive, *branch, *appSlug, *token, logger); err != nil {
+	if err := uploadCacheArchive(*cacheArchive, *branch, *appSlug, *token, *uploadURL, logger); err != nil {
 		fmt.Printf("Error uploading cache archive: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := uploadMetadata(*cacheMetadata, *branch, *appSlug, *token, logger); err != nil {
+	if err := uploadMetadata(*cacheMetadata, *branch, *appSlug, *token, *uploadURL, logger); err != nil {
 		fmt.Printf("Error uploading metadata: %v\n", err)
 		os.Exit(1)
 	}
