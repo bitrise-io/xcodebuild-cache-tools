@@ -20,7 +20,7 @@ import (
 var ErrCacheNotFound = errors.New("no cache archive found for the provided keys")
 
 func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl string, logger log.Logger) error {
-	logger.Infof("Downloading %s to %s\n", downloadPath, cacheUrl)
+	logger.Infof("Downloading %s from %s\n", downloadPath, cacheUrl)
 	buildCacheHost, insecureGRPC, err := kv.ParseUrlGRPC(cacheUrl)
 	if err != nil {
 		return fmt.Errorf(
@@ -66,8 +66,8 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 func main() {
 	logger := log.NewLogger()
 
-	cacheArchive := flag.String("cache-archive", "", "Download path for the cache archive")
-	cacheMetadata := flag.String("cache-metadata", "", "Download path for the cache metadata")
+	cacheArchiveDownloadPath := flag.String("cache-archive", "", "Download path for the cache archive")
+	cacheMetadataDownloadPath := flag.String("cache-metadata", "", "Download path for the cache metadata")
 	serviceURL := flag.String("service-url", "", "Build Cache service URL")
 	token := flag.String("access-token", "", "Access-token")
 	branch := flag.String("branch", "", "Branch")
@@ -75,23 +75,21 @@ func main() {
 	flag.Parse()
 
 	cacheArchiveKey := fmt.Sprintf("%s-archive", *branch)
-	cacheArchiveDownloadPath := fmt.Sprintf("dd.tar.zst")
 	cacheMetadataKey := fmt.Sprintf("%s-metadata", *branch)
-	cacheMetadataDownloadPath := fmt.Sprintf("dd-cache-metadata.json")
 
-	if *cacheArchive == "" || *cacheMetadata == "" || *serviceURL == "" || *token == "" || *branch == "" {
+	if *cacheArchiveDownloadPath == "" || *cacheMetadataDownloadPath == "" || *serviceURL == "" || *token == "" || *branch == "" {
 		fmt.Println("cache-archive, cache-metadata, access-token, branch and service-url are required")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	err := download(context.Background(), cacheArchiveDownloadPath, cacheArchiveKey, *token, *serviceURL, logger)
+	err := download(context.Background(), *cacheArchiveDownloadPath, cacheArchiveKey, *token, *serviceURL, logger)
 	if err != nil {
 		fmt.Printf("Error downloading cache archive: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = download(context.Background(), cacheMetadataDownloadPath, cacheMetadataKey, *token, *serviceURL, logger)
+	err = download(context.Background(), *cacheMetadataDownloadPath, cacheMetadataKey, *token, *serviceURL, logger)
 	if err != nil {
 		fmt.Printf("Error downloading cache metadata: %v\n", err)
 		os.Exit(1)
