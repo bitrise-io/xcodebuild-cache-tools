@@ -18,6 +18,7 @@ type PutParams struct {
 func (c *Client) StartPut(ctx context.Context, p PutParams) (io.WriteCloser, error) {
 	md := metadata.Pairs(
 		"authorization", fmt.Sprintf("bearer %s", c.token),
+		"x-org-id", "dbd227a0aeb70859",
 		"x-flare-blob-validation-sha256", p.Sha256Sum,
 		"x-flare-blob-validation-level", "error",
 		"x-flare-no-skip-duplicate-writes", "true",
@@ -47,7 +48,9 @@ func (c *Client) Get(ctx context.Context, name string) (io.ReadCloser, error) {
 		ReadOffset:   0,
 		ReadLimit:    0,
 	}
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", c.token))
+	md := metadata.Pairs(
+		"authorization", fmt.Sprintf("Bearer %s", c.token),
+		"x-org-id", "dbd227a0aeb70859")
 	ctx = metadata.NewOutgoingContext(ctx, md)
 	stream, err := c.bitriseKVClient.Get(ctx, readReq)
 	if err != nil {
