@@ -9,6 +9,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/bitrise-io/go-utils/v2/log"
 	"github.com/bitrise-io/xcodebuild-cache-tools/ddcache/proto/kv_storage"
 	"google.golang.org/genproto/googleapis/bytestream"
 	"google.golang.org/grpc"
@@ -19,6 +20,7 @@ import (
 type Client struct {
 	bytestreamClient bytestream.ByteStreamClient
 	bitriseKVClient  kv_storage.KVStorageClient
+	logger           log.Logger
 	clientName       string
 	token            string
 }
@@ -31,7 +33,7 @@ type NewClientParams struct {
 	Token       string
 }
 
-func NewClient(ctx context.Context, p NewClientParams) (*Client, error) {
+func NewClient(ctx context.Context, p NewClientParams, logger log.Logger) (*Client, error) {
 	ctx, cancel := context.WithTimeout(ctx, p.DialTimeout)
 	defer cancel()
 	creds := credentials.NewTLS(&tls.Config{})
@@ -49,10 +51,12 @@ func NewClient(ctx context.Context, p NewClientParams) (*Client, error) {
 		bitriseKVClient:  kv_storage.NewKVStorageClient(conn),
 		clientName:       p.ClientName,
 		token:            p.Token,
+		logger:           logger,
 	}, nil
 }
 
 type writer struct {
+	logger       log.Logger
 	stream       bytestream.ByteStream_WriteClient
 	resourceName string
 	offset       int64
@@ -64,13 +68,14 @@ func (w *writer) Write(p []byte) (int, error) {
 		ResourceName: w.resourceName,
 		WriteOffset:  w.offset,
 		Data:         p,
-		FinishWrite:  w.offset+int64(len(p)) >= w.fileSize,
 	}
+	w.logger.Debugf("sending write request %d bytes", len(p))
 	err := w.stream.Send(req)
 	switch {
 	case errors.Is(err, io.EOF):
 		return 0, io.EOF
 	case err != nil:
+		w.logger.Errorf("Error sending data: %v", err)
 		return 0, fmt.Errorf("send data: %w", err)
 	}
 	w.offset += int64(len(p))
@@ -78,8 +83,21 @@ func (w *writer) Write(p []byte) (int, error) {
 }
 
 func (w *writer) Close() error {
-	_, err := w.stream.CloseAndRecv()
+	w.logger.Debugf("sending finish write")
+	err := w.stream.Send(&bytestream.WriteRequest{
+		ResourceName: w.resourceName,
+		WriteOffset:  w.offset,
+		FinishWrite:  true,
+	})
 	if err != nil {
+		w.logger.Errorf("Error sending finish write: %v", err)
+		return fmt.Errorf("send finish write: %w", err)
+	}
+
+	w.logger.Debugf("closing stream")
+	_, err = w.stream.CloseAndRecv()
+	if err != nil {
+		w.logger.Errorf("Error sending finish write: %v", err)
 		return fmt.Errorf("close stream: %w", err)
 	}
 	return nil

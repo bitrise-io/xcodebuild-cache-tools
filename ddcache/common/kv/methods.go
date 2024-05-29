@@ -13,10 +13,9 @@ import (
 type PutParams struct {
 	Name      string
 	Sha256Sum string
-	FileSize  int64
 }
 
-func (c *Client) Put(ctx context.Context, p PutParams) (io.WriteCloser, error) {
+func (c *Client) StartPut(ctx context.Context, p PutParams) (io.WriteCloser, error) {
 	md := metadata.Pairs(
 		"authorization", fmt.Sprintf("bearer %s", c.token),
 		"x-flare-blob-validation-sha256", p.Sha256Sum,
@@ -29,13 +28,14 @@ func (c *Client) Put(ctx context.Context, p PutParams) (io.WriteCloser, error) {
 		return nil, fmt.Errorf("initiate put: %w", err)
 	}
 
+	c.logger.Debugf("Stream initialized: %s", p.Name)
 	resourceName := fmt.Sprintf("%s/%s", c.clientName, p.Name)
 
 	return &writer{
 		stream:       stream,
 		resourceName: resourceName,
 		offset:       0,
-		fileSize:     p.FileSize,
+		logger:       c.logger,
 	}, nil
 }
 
