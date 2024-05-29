@@ -58,8 +58,8 @@ func streamUploadFile(filePath string, fileFinished <-chan bool, writer io.Write
 	return nil
 }
 
-func upload(directory, key, accessToken, cacheUrl string, logger log.Logger) error {
-	logger.Infof("Initializing uploading %s to %s\n", directory, cacheUrl)
+func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.Logger) error {
+	logger.Infof("Initializing uploading %s to %s\n", path, cacheUrl)
 	buildCacheHost, insecureGRPC, err := kv.ParseUrlGRPC(cacheUrl)
 	if err != nil {
 		return fmt.Errorf(
@@ -67,12 +67,6 @@ func upload(directory, key, accessToken, cacheUrl string, logger log.Logger) err
 			cacheUrl, err,
 		)
 	}
-	//
-	//checksum, err := util.ChecksumOfFile(filePath)
-	//if err != nil {
-	//	logger.Warnf(err.Error())
-	//	// fail silently and continue
-	//}
 
 	const retries = 3
 	err = retry.Times(retries).Wait(5 * time.Second).TryWithAbort(func(attempt uint) (error, bool) {
@@ -100,42 +94,54 @@ func upload(directory, key, accessToken, cacheUrl string, logger log.Logger) err
 			return fmt.Errorf("create kv put client: %w", err), false
 		}
 
-		tmpFile := os.TempDir() + "/ddcache-save-tmp" + key
-		_ = os.Remove(tmpFile)
+		if compress {
+			tmpFile := os.TempDir() + "/ddcache-save-tmp" + key
+			_ = os.Remove(tmpFile)
 
-		_, err = os.OpenFile(tmpFile, os.O_RDONLY|os.O_CREATE, 0644)
-		if err != nil {
-			return fmt.Errorf("create tmp file: %w", err), false
-		}
-
-		c := exec.Command("zsh", "-c", fmt.Sprintf("tar -vcpPf - %s | stdbuf -i1M -o1M -e0 zstdcat -v > %s", directory, tmpFile))
-		var outputBuf bytes.Buffer
-		c.Stderr = &outputBuf
-		c.Stdout = &outputBuf
-
-		tarFinishedChan := make(chan bool)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			err := streamUploadFile(tmpFile, tarFinishedChan, kvWriter, logger)
+			_, err = os.OpenFile(tmpFile, os.O_RDONLY|os.O_CREATE, 0644)
 			if err != nil {
-				logger.Errorf("Error uploading file: %v\n", err)
+				return fmt.Errorf("create tmp file: %w", err), true
 			}
-			wg.Done()
-		}()
 
-		if err := c.Run(); err != nil {
-			logger.Errorf("Error running tar. output: %s\n", outputBuf.String())
-			return fmt.Errorf("run tar: %w", err), false
+			c := exec.Command("zsh", "-c", fmt.Sprintf("tar -vcpPf - %s | stdbuf -i1M -o1M -e0 zstdcat -v > %s", path, tmpFile))
+			var outputBuf bytes.Buffer
+			c.Stderr = &outputBuf
+			c.Stdout = &outputBuf
+
+			tarFinishedChan := make(chan bool)
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				err := streamUploadFile(tmpFile, tarFinishedChan, kvWriter, logger)
+				if err != nil {
+					logger.Errorf("Error uploading file: %v\n", err)
+				}
+				wg.Done()
+			}()
+
+			if err := c.Run(); err != nil {
+				logger.Errorf("Error running tar. output: %s\n", outputBuf.String())
+				return fmt.Errorf("run tar: %w", err), false
+			}
+			logger.Infof("Tar command completed.\n")
+			logger.Debugf("Tar output: %s\n", outputBuf.String())
+			close(tarFinishedChan)
+
+			wg.Wait()
+			logger.Debugf("Upload completed\n")
+		} else {
+			file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
+			if err != nil {
+				return fmt.Errorf("read file: %w", err), false
+			}
+			_, err = io.Copy(kvWriter, file)
+			if err != nil {
+				return fmt.Errorf("copy file: %w", err), false
+			}
 		}
-		logger.Infof("Tar command completed.\n")
-		logger.Debugf("Tar output: %s\n", outputBuf.String())
-		close(tarFinishedChan)
-
-		wg.Wait()
-		logger.Debugf("Upload completed\n")
 
 		if err := kvWriter.Close(); err != nil {
+			logger.Errorf("Error closing writer: %v\n", err)
 			return fmt.Errorf("close upload: %w", err), false
 		}
 		return nil, false
@@ -165,12 +171,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := upload(*cacheDirectory, fmt.Sprintf("%s-archive", *branch), *accessToken, *uploadURL, logger); err != nil {
+	if err := upload(*cacheDirectory,
+		fmt.Sprintf("%s-archive", *branch),
+		*accessToken, *uploadURL,
+		true,
+		logger); err != nil {
 		logger.Errorf("Error uploading cache archive: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := upload(*cacheMetadata, fmt.Sprintf("%s-metadata", *branch), *accessToken, *uploadURL, logger); err != nil {
+	if err := upload(*cacheMetadata,
+		fmt.Sprintf("%s-metadata", *branch),
+		*accessToken, *uploadURL,
+		false,
+		logger); err != nil {
 		logger.Errorf("Error uploading metadata: %v\n", err)
 		os.Exit(1)
 	}
