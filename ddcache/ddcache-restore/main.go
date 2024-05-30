@@ -12,14 +12,16 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"bytes"
 	"github.com/bitrise-io/go-utils/v2/log"
 	"github.com/bitrise-io/xcodebuild-cache-tools/ddcache/common/kv"
+	"os/exec"
 )
 
 // ErrCacheNotFound ...
 var ErrCacheNotFound = errors.New("no cache archive found for the provided keys")
 
-func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl string, logger log.Logger) error {
+func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl string, decompress bool, logger log.Logger) error {
 	logger.Infof("Downloading %s from %s\n", downloadPath, cacheUrl)
 	logger.Infof("Get key: %s\n", key)
 	buildCacheHost, insecureGRPC, err := kv.ParseUrlGRPC(cacheUrl)
@@ -47,20 +49,39 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 		return fmt.Errorf("new kv client: %w", err)
 	}
 
-	kvReader, err := kvClient.Get(ctx, key)
+	kvReader, err := kvClient.StartGet(ctx, key)
 	if err != nil {
 		return fmt.Errorf("create kv get client: %w", err)
 	}
 	defer kvReader.Close()
 
-	if _, err := io.Copy(file, kvReader); err != nil {
-		st, ok := status.FromError(err)
-		if ok && st.Code() == codes.NotFound {
-			return ErrCacheNotFound
+	if decompress {
+		var outBuf bytes.Buffer
+
+		c := exec.Command("sh", "-c", "stdbuf -i1M -o1M -e0 zstdcat | tar -xPpf -")
+		c.Stdin = kvReader
+		c.Stderr = &outBuf
+		c.Stdout = &outBuf
+
+		if err := c.Run(); err != nil {
+			logger.Debugf("Tar output: %s\n", outBuf.String())
+			return fmt.Errorf("failed to decompress archive: %w", err)
 		}
-		logger.Debugf("Failed to download archive: %s", err)
-		return fmt.Errorf("failed to download archive: %w", err)
+		for _, f := range c.ExtraFiles {
+			_ = f.Close()
+		}
+		logger.Debugf("Tar complete. Output: %s\n", outBuf.String())
+	} else {
+		if _, err := io.Copy(file, kvReader); err != nil {
+			st, ok := status.FromError(err)
+			if ok && st.Code() == codes.NotFound {
+				return ErrCacheNotFound
+			}
+			logger.Errorf("Failed to download archive: %s", err)
+			return fmt.Errorf("failed to download archive: %w", err)
+		}
 	}
+
 	return nil
 }
 
@@ -85,15 +106,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	err := download(context.Background(), *cacheArchiveDownloadPath, cacheArchiveKey, *token, *serviceURL, logger)
+	err := download(context.Background(),
+		*cacheArchiveDownloadPath, cacheArchiveKey, *token, *serviceURL,
+		true, logger)
 	if err != nil {
-		fmt.Printf("Error downloading cache archive: %v\n", err)
+		logger.Errorf("Error downloading cache archive: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = download(context.Background(), *cacheMetadataDownloadPath, cacheMetadataKey, *token, *serviceURL, logger)
+	err = download(context.Background(),
+		*cacheMetadataDownloadPath, cacheMetadataKey, *token, *serviceURL,
+		false, logger)
 	if err != nil {
-		fmt.Printf("Error downloading cache metadata: %v\n", err)
+		logger.Errorf("Error downloading cache metadata: %v\n", err)
 		os.Exit(1)
 	}
 

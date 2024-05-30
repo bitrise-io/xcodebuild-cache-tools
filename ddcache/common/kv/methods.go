@@ -40,7 +40,7 @@ func (c *Client) StartPut(ctx context.Context, p PutParams) (io.WriteCloser, err
 	}, nil
 }
 
-func (c *Client) Get(ctx context.Context, name string) (io.ReadCloser, error) {
+func (c *Client) StartGet(ctx context.Context, name string) (io.ReadCloser, error) {
 	resourceName := fmt.Sprintf("%s/%s", c.clientName, name)
 
 	readReq := &bytestream.ReadRequest{
