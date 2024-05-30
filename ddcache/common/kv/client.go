@@ -122,7 +122,7 @@ func (r *reader) Read(p []byte) (int, error) {
 
 	if r.sumBytesRead == 0 {
 		r.logger.Debugf("Reading %d bytes", len(p))
-	} else if len(p) < 1024*1024 || r.sumBytesRead > 1024*1024 && ((r.sumBytesRead/(1024*1024))%10 == 0) {
+	} else if r.sumBytesRead > 1024*1024 && ((r.sumBytesRead/(1024*1024))%10 == 0) {
 		r.logger.Debugf("Reading %d bytes. Sum read %.2fMB", len(p), float32(r.sumBytesRead)/(1024*1024))
 	}
 
