@@ -70,10 +70,10 @@ func (w *writer) Write(p []byte) (int, error) {
 		WriteOffset:  w.offset,
 		Data:         p,
 	}
-	if len(p) < 1024*1024 || w.offset > 1024*1024 && ((w.offset/(1024*1024))%10 == 0) {
-		w.logger.Debugf("Sending write request %d bytes @ offset %.2fMB", len(p), float32(w.offset)/(1024*1024))
-	} else if w.offset == 0 {
+	if w.offset == 0 {
 		w.logger.Debugf("Sending write request %d bytes", len(p))
+	} else if len(p) < 1024*1024 || w.offset > 1024*1024 && ((w.offset/(1024*1024))%10 == 0) {
+		w.logger.Debugf("Sending write request %d bytes @ offset %.2fMB", len(p), float32(w.offset)/(1024*1024))
 	}
 	err := w.stream.Send(req)
 	switch {
@@ -120,10 +120,10 @@ func (r *reader) Read(p []byte) (int, error) {
 		return 0, nil
 	}
 
-	if len(p) < 1024*1024 || r.sumBytesRead > 1024*1024 && ((r.sumBytesRead/(1024*1024))%10 == 0) {
-		r.logger.Debugf("Reading %d bytes. Sum read %.2fMB", len(p), float32(r.sumBytesRead)/(1024*1024))
-	} else if r.sumBytesRead == 0 {
+	if r.sumBytesRead == 0 {
 		r.logger.Debugf("Reading %d bytes", len(p))
+	} else if len(p) < 1024*1024 || r.sumBytesRead > 1024*1024 && ((r.sumBytesRead/(1024*1024))%10 == 0) {
+		r.logger.Debugf("Reading %d bytes. Sum read %.2fMB", len(p), float32(r.sumBytesRead)/(1024*1024))
 	}
 
 	bufLen := r.buf.Len()
