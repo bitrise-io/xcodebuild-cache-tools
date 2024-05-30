@@ -70,7 +70,7 @@ func (w *writer) Write(p []byte) (int, error) {
 		WriteOffset:  w.offset,
 		Data:         p,
 	}
-	if w.offset > 1024*1024 && ((w.offset/(1024*1024))%10 == 0) {
+	if len(p) < 1024*1024 || w.offset > 1024*1024 && ((w.offset/(1024*1024))%10 == 0) {
 		w.logger.Debugf("Sending write request %d bytes @ offset %.2fMB", len(p), float32(w.offset)/(1024*1024))
 	} else if w.offset == 0 {
 		w.logger.Debugf("Sending write request %d bytes", len(p))
