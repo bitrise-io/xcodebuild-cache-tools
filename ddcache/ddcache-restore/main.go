@@ -21,6 +21,7 @@ var ErrCacheNotFound = errors.New("no cache archive found for the provided keys"
 
 func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl string, logger log.Logger) error {
 	logger.Infof("Downloading %s from %s\n", downloadPath, cacheUrl)
+	logger.Infof("Get key: %s\n", key)
 	buildCacheHost, insecureGRPC, err := kv.ParseUrlGRPC(cacheUrl)
 	if err != nil {
 		return fmt.Errorf(
@@ -75,8 +76,8 @@ func main() {
 
 	flag.Parse()
 
-	cacheArchiveKey := fmt.Sprintf("%s-archive", *branch)
-	cacheMetadataKey := fmt.Sprintf("%s-metadata", *branch)
+	cacheArchiveKey := fmt.Sprintf("%s-archive-stream", *branch)
+	cacheMetadataKey := fmt.Sprintf("%s-metadata-stream", *branch)
 
 	if *cacheArchiveDownloadPath == "" || *cacheMetadataDownloadPath == "" || *serviceURL == "" || *token == "" || *branch == "" {
 		fmt.Println("cache-archive, cache-metadata, access-token, branch and service-url are required")

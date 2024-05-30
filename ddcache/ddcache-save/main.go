@@ -68,6 +68,7 @@ func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.L
 		)
 	}
 
+	logger.Infof("Put key: %s\n", key)
 	const retries = 3
 	err = retry.Times(retries).Wait(5 * time.Second).TryWithAbort(func(attempt uint) (error, bool) {
 		if attempt != 0 {
@@ -172,7 +173,7 @@ func main() {
 	}
 
 	if err := upload(*cacheDirectory,
-		fmt.Sprintf("%s-archive", *branch),
+		fmt.Sprintf("%s-archive-stream", *branch),
 		*accessToken, *uploadURL,
 		true,
 		logger); err != nil {
@@ -181,7 +182,7 @@ func main() {
 	}
 
 	if err := upload(*cacheMetadata,
-		fmt.Sprintf("%s-metadata", *branch),
+		fmt.Sprintf("%s-metadata-stream", *branch),
 		*accessToken, *uploadURL,
 		false,
 		logger); err != nil {
