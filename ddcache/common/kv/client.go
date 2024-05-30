@@ -34,6 +34,7 @@ type NewClientParams struct {
 }
 
 func NewClient(ctx context.Context, p NewClientParams, logger log.Logger) (*Client, error) {
+	logger.Debugf("Creating client for %s", p.Host)
 	ctx, cancel := context.WithTimeout(ctx, p.DialTimeout)
 	defer cancel()
 	creds := credentials.NewTLS(&tls.Config{})

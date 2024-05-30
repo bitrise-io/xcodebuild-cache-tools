@@ -34,24 +34,26 @@ func streamUploadFile(filePath string, fileFinished <-chan bool, writer io.Write
 		default:
 		}
 
-		read, err := reader.Read(buf)
-		if read == 0 || errors.Is(err, io.EOF) {
+		readBytes, err := reader.Read(buf)
+
+		if readBytes > 0 {
+			_, err = writer.Write(buf[:readBytes])
+			if err != nil {
+				return fmt.Errorf("write to stream: %w", err)
+			}
+		}
+
+		if readBytes == 0 || errors.Is(err, io.EOF) {
 			if done {
 				logger.Infof("File read completed\n")
 				return nil
 			} else {
 				logger.Debugf("File read completed, but not done\n")
+				// Let the compression stage write some bytes...
 				time.Sleep(1 * time.Second)
 			}
 		} else if err != nil {
 			return err
-		}
-
-		if read > 0 {
-			_, err = writer.Write(buf[:read])
-			if err != nil {
-				return fmt.Errorf("write to stream: %w", err)
-			}
 		}
 	}
 
