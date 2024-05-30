@@ -58,6 +58,10 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 		c.Stdout = &outBuf
 
 		if err := c.Run(); err != nil {
+			st, ok := status.FromError(err)
+			if ok && st.Code() == codes.NotFound {
+				return ErrCacheNotFound
+			}
 			logger.Debugf("Tar output: %s\n", outBuf.String())
 			return fmt.Errorf("failed to decompress archive: %w", err)
 		}
