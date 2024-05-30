@@ -103,7 +103,7 @@ func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.L
 				return fmt.Errorf("create tmp file: %w", err), true
 			}
 
-			c := exec.Command("zsh", "-c", fmt.Sprintf("tar -vcpPf --format posix - %s | stdbuf -i1M -o1M -e0 zstdcat -v > %s", path, tmpFile))
+			c := exec.Command("sh", "-c", fmt.Sprintf("tar -vcpPf - --format posix %s | stdbuf -i1M -o1M -e0 zstdcat -v > %s", path, tmpFile))
 			var outputBuf bytes.Buffer
 			c.Stderr = &outputBuf
 			c.Stdout = &outputBuf
