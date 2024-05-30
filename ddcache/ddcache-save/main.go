@@ -29,11 +29,13 @@ func streamUploadFile(filePath string, fileFinished <-chan bool, writer io.Write
 	fileDone := false
 	readDone := false
 	for !readDone {
-		select {
-		case <-fileFinished:
-			logger.Debugf("File finished, setting done flag\n")
-			fileDone = true
-		default:
+		if !fileDone {
+			select {
+			case <-fileFinished:
+				logger.Debugf("File finished, setting done flag\n")
+				fileDone = true
+			default:
+			}
 		}
 
 		readBytes, err := reader.Read(buf)
@@ -141,6 +143,7 @@ func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.L
 			close(tarFinishedChan)
 
 			wg.Wait()
+			_ = os.Remove(tmpFile)
 			logger.Debugf("Upload completed\n")
 		} else {
 			file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
