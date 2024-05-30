@@ -69,7 +69,9 @@ func (w *writer) Write(p []byte) (int, error) {
 		WriteOffset:  w.offset,
 		Data:         p,
 	}
-	w.logger.Debugf("sending write request %d bytes", len(p))
+	if (w.offset/(1024*1024))%10 == 0 {
+		w.logger.Debugf("Sending write request %d bytes @ offset %dMB", len(p), w.offset/(1024*1024))
+	}
 	err := w.stream.Send(req)
 	switch {
 	case errors.Is(err, io.EOF):
@@ -94,7 +96,7 @@ func (w *writer) Close() error {
 		return fmt.Errorf("send finish write: %w", err)
 	}
 
-	w.logger.Debugf("closing stream")
+	w.logger.Debugf("Closing stream")
 	_, err = w.stream.CloseAndRecv()
 	if err != nil {
 		w.logger.Errorf("Error sending finish write: %v", err)
