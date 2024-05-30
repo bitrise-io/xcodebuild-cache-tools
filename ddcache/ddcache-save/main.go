@@ -25,12 +25,13 @@ func streamUploadFile(filePath string, fileFinished <-chan bool, writer io.Write
 
 	buf := make([]byte, 1024*1024)
 
-	done := false
-	for !done {
+	fileDone := false
+	readDone := false
+	for !readDone {
 		select {
 		case <-fileFinished:
 			logger.Debugf("File finished, setting done flag\n")
-			done = true
+			fileDone = true
 		default:
 		}
 
@@ -44,11 +45,13 @@ func streamUploadFile(filePath string, fileFinished <-chan bool, writer io.Write
 		}
 
 		if readBytes == 0 || errors.Is(err, io.EOF) {
-			if done {
+			if fileDone {
 				logger.Infof("File read completed\n")
-				return nil
+				// Only stop reading if file is done.
+				// Note: we can still read multiple cycles if the sending is lagging behind
+				readDone = true
 			} else {
-				logger.Debugf("File read completed, but not done\n")
+				logger.Debugf("File read completed, but not file is not done yet\n")
 				// Let the compression stage write some bytes...
 				time.Sleep(1 * time.Second)
 			}
@@ -101,11 +104,14 @@ func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.L
 			tmpFile := os.TempDir() + "/ddcache-save-tmp" + key
 			_ = os.Remove(tmpFile)
 
-			_, err = os.OpenFile(tmpFile, os.O_RDONLY|os.O_CREATE, 0644)
+			touch, err := os.OpenFile(tmpFile, os.O_RDONLY|os.O_CREATE, 0644)
 			if err != nil {
 				return fmt.Errorf("create tmp file: %w", err), true
 			}
+			_ = touch.Close()
 
+			// Note: cannot set buffer / chunk size in zstd so we're writing a tmp file and reading 1MB chunks to
+			// optimize cache performance.
 			c := exec.Command("sh", "-c", fmt.Sprintf("tar -cpPf - --format posix %s | stdbuf -i1M -o1M -e0 zstdcat > %s", path, tmpFile))
 			var outputBuf bytes.Buffer
 			c.Stderr = &outputBuf
@@ -125,6 +131,9 @@ func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.L
 			if err := c.Run(); err != nil {
 				logger.Errorf("Error running tar. output: %s\n", outputBuf.String())
 				return fmt.Errorf("run tar: %w", err), false
+			}
+			for _, f := range c.ExtraFiles {
+				_ = f.Close()
 			}
 			logger.Infof("Tar command completed.\n")
 			logger.Debugf("Tar output: %s\n", outputBuf.String())
