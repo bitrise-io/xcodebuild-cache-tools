@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/bitrise-io/go-utils/v2/log"
 	"google.golang.org/genproto/googleapis/bytestream"
 	"google.golang.org/grpc/metadata"
 )
@@ -40,7 +41,7 @@ func (c *Client) StartPut(ctx context.Context, p PutParams) (io.WriteCloser, err
 	}, nil
 }
 
-func (c *Client) StartGet(ctx context.Context, name string) (io.ReadCloser, error) {
+func (c *Client) StartGet(ctx context.Context, name string, logger log.Logger) (io.ReadCloser, error) {
 	resourceName := fmt.Sprintf("%s/%s", c.clientName, name)
 
 	readReq := &bytestream.ReadRequest{
@@ -57,8 +58,11 @@ func (c *Client) StartGet(ctx context.Context, name string) (io.ReadCloser, erro
 		return nil, fmt.Errorf("initiate get: %w", err)
 	}
 
+	c.logger.Debugf("Stream initialized: %s", name)
+
 	return &reader{
 		stream: stream,
 		buf:    bytes.Buffer{},
+		logger: logger,
 	}, nil
 }

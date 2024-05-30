@@ -109,8 +109,10 @@ func (w *writer) Close() error {
 }
 
 type reader struct {
-	stream bytestream.ByteStream_ReadClient
-	buf    bytes.Buffer
+	stream       bytestream.ByteStream_ReadClient
+	buf          bytes.Buffer
+	logger       log.Logger
+	sumBytesRead int
 }
 
 func (r *reader) Read(p []byte) (int, error) {
@@ -118,9 +120,16 @@ func (r *reader) Read(p []byte) (int, error) {
 		return 0, nil
 	}
 
+	if len(p) < 1024*1024 || r.sumBytesRead > 1024*1024 && ((r.sumBytesRead/(1024*1024))%10 == 0) {
+		r.logger.Debugf("Reading %d bytes. Sum read %.2fMB", len(p), float32(r.sumBytesRead)/(1024*1024))
+	} else if r.sumBytesRead == 0 {
+		r.logger.Debugf("Reading %d bytes", len(p))
+	}
+
 	bufLen := r.buf.Len()
 	if bufLen > 0 {
 		n, _ := r.buf.Read(p) // this will never fail
+		r.sumBytesRead += n
 		return n, nil
 	}
 	r.buf.Reset()
@@ -134,6 +143,7 @@ func (r *reader) Read(p []byte) (int, error) {
 	}
 
 	n := copy(p, resp.Data)
+	r.sumBytesRead += n
 	if n == len(resp.Data) {
 		return n, nil
 	}

@@ -32,12 +32,6 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 		)
 	}
 
-	file, err := os.Create(downloadPath)
-	if err != nil {
-		return fmt.Errorf("create %q: %w", downloadPath, err)
-	}
-	defer file.Close()
-
 	kvClient, err := kv.NewClient(ctx, kv.NewClientParams{
 		UseInsecure: insecureGRPC,
 		Host:        buildCacheHost,
@@ -49,7 +43,7 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 		return fmt.Errorf("new kv client: %w", err)
 	}
 
-	kvReader, err := kvClient.StartGet(ctx, key)
+	kvReader, err := kvClient.StartGet(ctx, key, logger)
 	if err != nil {
 		return fmt.Errorf("create kv get client: %w", err)
 	}
@@ -72,6 +66,12 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 		}
 		logger.Debugf("Tar complete. Output: %s\n", outBuf.String())
 	} else {
+		file, err := os.Create(downloadPath)
+		if err != nil {
+			return fmt.Errorf("create %q: %w", downloadPath, err)
+		}
+		defer file.Close()
+
 		if _, err := io.Copy(file, kvReader); err != nil {
 			st, ok := status.FromError(err)
 			if ok && st.Code() == codes.NotFound {
@@ -89,7 +89,6 @@ func main() {
 	logger := log.NewLogger()
 	logger.EnableDebugLog(true)
 
-	cacheArchiveDownloadPath := flag.String("cache-archive", "", "Download path for the cache archive")
 	cacheMetadataDownloadPath := flag.String("cache-metadata", "", "Download path for the cache metadata")
 	serviceURL := flag.String("service-url", "", "Build Cache service URL")
 	token := flag.String("access-token", "", "Access-token")
@@ -100,14 +99,14 @@ func main() {
 	cacheArchiveKey := fmt.Sprintf("%s-archive-stream", *branch)
 	cacheMetadataKey := fmt.Sprintf("%s-metadata-stream", *branch)
 
-	if *cacheArchiveDownloadPath == "" || *cacheMetadataDownloadPath == "" || *serviceURL == "" || *token == "" || *branch == "" {
+	if *cacheMetadataDownloadPath == "" || *serviceURL == "" || *token == "" || *branch == "" {
 		fmt.Println("cache-archive, cache-metadata, access-token, branch and service-url are required")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	err := download(context.Background(),
-		*cacheArchiveDownloadPath, cacheArchiveKey, *token, *serviceURL,
+		"", cacheArchiveKey, *token, *serviceURL,
 		true, logger)
 	if err != nil {
 		logger.Errorf("Error downloading cache archive: %v\n", err)
