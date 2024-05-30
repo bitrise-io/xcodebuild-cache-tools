@@ -41,7 +41,7 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 		DialTimeout: 5 * time.Second,
 		ClientName:  "kv",
 		Token:       accessToken,
-	})
+	}, logger)
 	if err != nil {
 		return fmt.Errorf("new kv client: %w", err)
 	}
@@ -65,6 +65,7 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 
 func main() {
 	logger := log.NewLogger()
+	logger.EnableDebugLog(true)
 
 	cacheArchiveDownloadPath := flag.String("cache-archive", "", "Download path for the cache archive")
 	cacheMetadataDownloadPath := flag.String("cache-metadata", "", "Download path for the cache metadata")
