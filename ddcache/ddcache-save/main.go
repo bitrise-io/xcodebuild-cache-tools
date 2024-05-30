@@ -23,6 +23,7 @@ func streamUploadFile(filePath string, fileFinished <-chan bool, writer io.Write
 		return fmt.Errorf("open file: %w", err)
 	}
 
+	// 1MiB buffer to optimize cache performance
 	buf := make([]byte, 1024*1024)
 
 	fileDone := false
@@ -110,7 +111,7 @@ func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.L
 			}
 			_ = touch.Close()
 
-			// Note: cannot set buffer / chunk size in zstd so we're writing a tmp file and reading 1MB chunks to
+			// Note: cannot set buffer / chunk size in zstd so we're writing a tmp file and reading 1MiB chunks to
 			// optimize cache performance.
 			c := exec.Command("sh", "-c", fmt.Sprintf("tar -cpPf - --format posix %s | stdbuf -i1M -o1M -e0 zstdcat > %s", path, tmpFile))
 			var outputBuf bytes.Buffer
@@ -144,12 +145,15 @@ func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.L
 		} else {
 			file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
 			if err != nil {
+				logger.Errorf("Error opening file: %v\n", err)
 				return fmt.Errorf("read file: %w", err), false
 			}
 			_, err = io.Copy(kvWriter, file)
 			if err != nil {
+				logger.Errorf("Error copying file: %v\n", err)
 				return fmt.Errorf("copy file: %w", err), false
 			}
+			_ = file.Close()
 		}
 
 		if err := kvWriter.Close(); err != nil {
