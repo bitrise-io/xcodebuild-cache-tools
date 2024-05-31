@@ -52,7 +52,7 @@ func download(ctx context.Context, downloadPath, key, accessToken, cacheUrl stri
 	if decompress {
 		var outBuf bytes.Buffer
 
-		c := exec.Command("sh", "-c", "stdbuf -i1M -o1M -e0 zstdcat | tar -xPpf -")
+		c := exec.Command("sh", "-c", "stdbuf -i1M -o1M -e0 zstdcat -T0 | tar -xPpf -")
 		c.Stdin = kvReader
 		c.Stderr = &outBuf
 		c.Stdout = &outBuf

@@ -115,7 +115,7 @@ func upload(path, key, accessToken, cacheUrl string, compress bool, logger log.L
 
 			// Note: cannot set buffer / chunk size in zstd so we're writing a tmp file and reading 1MiB chunks to
 			// optimize cache performance.
-			c := exec.Command("sh", "-c", fmt.Sprintf("tar -cpPf - --format posix %s | stdbuf -i1M -o1M -e0 zstdcat > %s", path, tmpFile))
+			c := exec.Command("sh", "-c", fmt.Sprintf("tar -cpPf - --format posix %s | stdbuf -i1M -o1M -e0 zstdcat -T0 --size-hint=1000M > %s", path, tmpFile))
 			var outputBuf bytes.Buffer
 			c.Stderr = &outputBuf
 			c.Stdout = &outputBuf
